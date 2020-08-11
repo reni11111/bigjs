@@ -5,7 +5,7 @@ let order = {
   lineItems: [
     {
       itemName: "apple",
-      quantity: 2.552,
+      quantity: 2,
       itemId: "1234",
       variationName: "red apple",
       variationId: "2345",
@@ -36,7 +36,9 @@ let order = {
       appliedTax: {
         id: "taxId12",
         name: "tax the rich",
-        percentage: 22
+        percentage: 20,
+        //can be ADDITIVE too
+        inclusionType: "ADDITIVE"
       },
       appliedDiscounts: [
         {
@@ -76,11 +78,10 @@ let order = {
           }
         }
       ],
-      // kjo ndoshta ju duhet ? dmth cmimi mbasi kam aplikuar discount/taksa tek ky produkt
-      // totalMoney: {
-      //   amount: 124,
-      //   currency: "All"
-      // }
+      totalMoney: {
+        amount: 112,
+        currency: "All"
+      }
     }
   ],
   //order discount
@@ -92,21 +93,16 @@ let order = {
       percentage: 10
     },
   ],
-  tax: {
-    id: "tax1",
-    name: "taksa e tvsh",
-    percentage: 5
-  },
   totalMoney: {
-    amount: 1000,
+    amount: 112,
     currency: "All"
   },
   totalTaxMoney: {
-    amount: 10,
+    amount: 19,
     currency: "All"
   },
   totalDiscountMoney: {
-    amount: 100,
+    amount: 441,
     currency: "All"
   },
 }
@@ -121,70 +117,106 @@ let order = {
 //6. apply item tax
 //7. sum all products
 
-// kujdes rrumbullakosjet
-
-
-// div will only keep 2 decimal values
-Big.DP = 2
-// + before function is same as Number()
 
 let orderTotalMoney = 0
 let orderTotalTax = 0
 let orderTotalDiscount = 0
 
+//to avoid if else at EVERY reduce function we can add empty array if no data
+order.appliedDiscounts = order.appliedDiscounts || []
+
 order.lineItems.map(orderLineItem => {
-  const modifiersPrice = +orderLineItem.modifiers.reduce((sum, { appliedMoney }) => Big(sum).plus(appliedMoney.amount), 0)
+  //to avoid if else at EVERY reduce function we can add empty array if no data
+  orderLineItem.modifiers = orderLineItem.modifiers || []
+  orderLineItem.modifiers = orderLineItem.modifiers || []
+  orderLineItem.appliedDiscounts = orderLineItem.appliedDiscounts || []
+
+  const modifiersPrice = orderLineItem.modifiers.reduce((sum, { appliedMoney }) => +Big(sum).plus(appliedMoney.amount), 0)
 
   const basePrice = +Big(orderLineItem.basePriceMoney.amount).plus(modifiersPrice)
 
-  const priceWithQuantity = +Big(basePrice).times(orderLineItem.quantity).round(2)
-
-  const itemPercentageDiscounts = orderLineItem.appliedDiscounts.filter(discount => discount.discountType === "FIXED_PERCENTAGE")
+  const priceWithQuantity = +Big(basePrice).times(orderLineItem.quantity).round(0)
 
   // percentage might be 0.1% or less so DP=2 would round that to 0
   Big.DP = 10
 
   // when multiple appliedDiscounts apply the next discount the the product who has been discounted
   // by the previous discount
+  const itemPercentageDiscounts = orderLineItem.appliedDiscounts.filter(discount => discount.discountType === "FIXED_PERCENTAGE")
   const priceWithItemDiscounts = +Big(itemPercentageDiscounts.reduce((itemPrice, { percentage }) => {
     const discountPercentage = +Big(percentage).div(100)
     const discountValue = Big(itemPrice).times(discountPercentage).round(0)
-
     return +Big(itemPrice).minus(discountValue)
   }, priceWithQuantity))
 
 
-
   // do order % discount here
   const orderPercentageDiscounts = order.appliedDiscounts.filter(discount => discount.discountType === "FIXED_PERCENTAGE")
-
   const priceWithOrderPercentageDiscounts = +Big(orderPercentageDiscounts.reduce((itemPrice, { percentage }) => {
     const discountPercentage = +Big(percentage).div(100)
     const discountValue = Big(itemPrice).times(discountPercentage).round(0)
-
     return +Big(itemPrice).minus(discountValue)
   }, priceWithItemDiscounts))
 
-  Big.DP = 2
 
   // line item discount amount
   const itemAmountDiscounts = orderLineItem.appliedDiscounts.filter(discount => discount.discountType === "FIXED_AMOUNT")
-
   const itemWithItemAmountDiscount = +Big(itemAmountDiscounts.reduce((itemPrice, { appliedMoney }) => {
     return +Big(itemPrice).minus(appliedMoney.amount)
   }, priceWithOrderPercentageDiscounts))
 
 
   // order amount discount here
+  const orderAmountDiscounts = order.appliedDiscounts.filter(discount => discount.discountType === "FIXED_AMOUNT")
+  const priceWithOrderAmountDiscounts = +Big(orderAmountDiscounts.reduce((itemPrice, { appliedMoney }) => {
+    return +Big(itemPrice).minus(appliedMoney.amount)
+  }, itemWithItemAmountDiscount))
+
+
+  // UPDATE ORDER TOTAL Discount
+  let itemTotalDiscount = +Big(priceWithQuantity).minus(priceWithOrderAmountDiscounts)
+  orderTotalDiscount = +Big(orderTotalDiscount).plus(itemTotalDiscount)
+
+  let priceWithTax = priceWithOrderAmountDiscounts
+  if(orderLineItem.appliedTax){
+    const taxPercentage= +Big(orderLineItem.appliedTax.percentage).div(100)
+    // UPDATE ORDER TOTAL TAX
+    orderTotalTax = +Big(priceWithOrderAmountDiscounts).times(taxPercentage).round(0)
+
+    if(orderLineItem.appliedTax.inclusionType==="ADDITIVE"){
+      priceWithTax = +Big(priceWithTax).plus(orderTotalTax)
+    }
+  }
+  
+  orderTotalMoney = +Big(orderTotalMoney).plus(priceWithTax)
 
   console.log("modifiers", modifiersPrice)
   console.log("basePrice", basePrice)
   console.log("priceWithQuantity", priceWithQuantity)
-  console.log("percentage", priceWithItemDiscounts)
+  console.log("percentage item discount", priceWithItemDiscounts)
+  console.log("amount item amount", itemWithItemAmountDiscount)
+  console.log("final pricing with tax", priceWithTax)
 
-  console.log("amount", itemWithItemAmountDiscount)
+  if(!Big(priceWithTax).eq(orderLineItem.totalMoney.amount)){
+    throw new Error(`item ${JSON.stringify(orderLineItem)} calculated wrong!`)
+  }
 }, 0)
 
+console.log("order total money", orderTotalMoney)
+console.log("order total discount", orderTotalDiscount)
+console.log("order total tax", orderTotalTax)
+
+if(!Big(order.totalMoney.amount).eq(orderTotalMoney)){
+  throw new Error(`order totalMoney calculated wrong!`)
+}
+
+if(!Big(order.totalTaxMoney.amount).eq(orderTotalTax)){
+  throw new Error(`order totalTaxMoney calculated wrong!`)
+}
+
+if(!Big(order.totalDiscountMoney.amount).eq(orderTotalDiscount)){
+  throw new Error(`order totalDiscountMoney calculated wrong!`)
+}
 
 
 // big js round tests and DP
@@ -204,109 +236,3 @@ order.lineItems.map(orderLineItem => {
 // z = Big(2.10111).times(100).round(2)
 
 // console.log(Number(z))
-
-
-// let orde2r = {
-//   id: "orderTestId",
-//   lineItems: [
-//     {
-//       itemName: "apple"
-//       quantity: 2.552
-//       itemId: "1234"
-//       variationName: "red apple"
-//       variationId: "2345"
-//       basePriceMoney: {
-//         amount: 255
-//         currency: "All"
-//       }
-//       modifiers: [{
-//         id: "majonezeId"
-//         name: "majoneze"
-//         modifierListId: "salacatId"
-//         modifierListName: "salcat"
-//         appliedMoney: {
-//           amount: 5
-//           currency: "All"
-//         }
-//       },
-//       {
-//         id: "ketchupId"
-//         name: "ketchup"
-//         modifierListId: "salacatId"
-//         modifierListName: "salcat"
-//         appliedMoney: {
-//           amount: 7
-//           currency: "All"
-//         }
-//       }]
-//       appliedTax: {
-//         id: "taxId12"
-//         name: "tax the rich"
-//         percentage: 22
-//       }
-//       appliedDiscounts: [
-//         {
-//           id: "discountId1"
-//           name: "black friday 5%"
-//           discountType: "FIXED_PERCENTAGE"
-//           percentage: 10
-//         },
-//         {
-//           id: "discountId2"
-//           name: "black friday 50%"
-//           discountType: "FIXED_PERCENTAGE"
-//           percentage: 50
-//         },
-//         {
-//           id: "discountId3"
-//           name: "black friday 20%"
-//           discountType: "FIXED_PERCENTAGE"
-//           percentage: 50
-//         },
-//         {
-//           id: "discountId24"
-//           name: "dita e veres 5%"
-//           discountType: "FIXED_AMOUNT"
-//           appliedMoney: {
-//             amount: 5
-//             currency: "All"
-//           }
-//         },
-//         {
-//           id: "discountId24"
-//           name: "dita e veres 5%"
-//           discountType: "FIXED_AMOUNT"
-//           appliedMoney: {
-//             amount: 10
-//             currency: "All"
-//           }
-//         }
-//       ]
-//     }
-//   ]
-//   appliedDiscounts: [
-//     {
-//       id: "discountId2"
-//       name: "black friday 5%"
-//       discountType: "FIXED_PERCENTAGE"
-//       percentage: 10
-//     }
-//   ]
-//   tax: {
-//     id: "tax1"
-//     name: "taksa e tvsh"
-//     percentage: 5
-//   }
-//   totalMoney: {
-//     amount: 1000
-//     currency: "All"
-//   }
-//   totalTaxMoney: {
-//     amount: 10
-//     currency: "All"
-//   }
-//   totalDiscountMoney: {
-//     amount: 100
-//     currency: "All"
-//   }
-// }
