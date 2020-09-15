@@ -10,36 +10,37 @@ let order = {
       variationName: "red apple",
       variationId: "2345",
       basePriceMoney: {
-        amount: 255,
+        amount: 30,
         currency: "All"
       },
       modifiers: [
-        {
-          id: "majonezeId",
-          name: "majoneze",
-          modifierListId: "salacatId",
-          modifierListName: "salcat",
-          appliedMoney: {
-            amount: 5,
-            currency: "All"
-          }
-        },
-        {
-          id: "ketchupId",
-          name: "ketchup",
-          modifierListId: "salacatId",
-          modifierListName: "salcat",
-          appliedMoney: {
-            amount: 7,
-            currency: "All"
-          }
-        }],
+        // {
+        //   id: "majonezeId",
+        //   name: "majoneze",
+        //   modifierListId: "salacatId",
+        //   modifierListName: "salcat",
+        //   appliedMoney: {
+        //     amount: 5,
+        //     currency: "All"
+        //   }
+        // },
+        // {
+        //   id: "ketchupId",
+        //   name: "ketchup",
+        //   modifierListId: "salacatId",
+        //   modifierListName: "salcat",
+        //   appliedMoney: {
+        //     amount: 7,
+        //     currency: "All"
+        //   }
+        // }
+      ],
       appliedTax: {
         id: "taxId12",
         name: "tax the rich",
-        percentage: 20,
+        percentage: 10,
         //can be ADDITIVE too
-        inclusionType: "ADDITIVE"
+        // inclusionType: "ADDITIVE"
       },
       appliedDiscounts: [
         {
@@ -53,7 +54,7 @@ let order = {
         }
       ],
       totalMoney: {
-        amount: 565,
+        amount: 47,
         currency: "All"
       }
     },
@@ -70,12 +71,12 @@ let order = {
       appliedTax: {
         id: "taxId12",
         name: "tax the rich",
-        percentage: 1,
+        percentage: 10,
         //can be ADDITIVE too
         // inclusionType: "ADDITIVE"
       },
       totalMoney: {
-        amount: 90,
+        amount: 93,
         currency: "All"
       }
     }
@@ -84,21 +85,24 @@ let order = {
   appliedDiscounts: [
     {
       id: "discountId2",
-      name: "black friday 5%",
-      discountType: "FIXED_PERCENTAGE",
-      percentage: 10
+      name: "black friday 10",
+      discountType: "FIXED_AMOUNT",
+      appliedMoney: {
+        amount: 10,
+        currency: "All"
+      }
     },
   ],
   totalMoney: {
-    amount: 655,
+    amount: 140,
     currency: "All"
   },
   totalTaxMoney: {
-    amount: 95,
+    amount: 14,
     currency: "All"
   },
   totalDiscountMoney: {
-    amount: 73,
+    amount: 20,
     currency: "All"
   },
 }
@@ -109,9 +113,12 @@ let order = {
 //3. apply item percentage discount
 //4. apply order percentage discount
 //4. apply item fixed amount discount
-//5. apply order fixed amount discount
-//6. apply item tax
-//7. sum all products
+//5. find order subtotal of items with fixed amount discount
+//6. apply portion of order fixed amount discount 
+// (if order discount is amount=10 and we have 2 items with price 80 and 20 each of them gets only the portion, so the first item gets80% of the discount
+// 80-8 =72  and the second item gets 20% of the discount 20-2 =18)
+//7. apply item tax
+//8. sum all products
 
 
 let orderTotalMoney = 0
@@ -121,8 +128,7 @@ let orderTotalDiscount = 0
 //to avoid if else at EVERY reduce function we can add empty array if no data
 order.appliedDiscounts = order.appliedDiscounts || []
 
-order.lineItems.map(orderLineItem => {
-  console.log("NEW ITEM")
+let lineItemsWithItemAmountDiscount = order.lineItems.map(orderLineItem => {
   //to avoid if else at EVERY reduce function we can add empty array if no data
   orderLineItem.modifiers = orderLineItem.modifiers || []
   orderLineItem.modifiers = orderLineItem.modifiers || []
@@ -158,91 +164,78 @@ order.lineItems.map(orderLineItem => {
 
   // line item discount amount
   const itemAmountDiscounts = orderLineItem.appliedDiscounts.filter(discount => discount.discountType === "FIXED_AMOUNT")
-  const itemWithItemAmountDiscount = +Big(itemAmountDiscounts.reduce((itemPrice, { appliedMoney }) => {
+  const priceWithItemAmountDiscount = +Big(itemAmountDiscounts.reduce((itemPrice, { appliedMoney }) => {
     return +Big(itemPrice).minus(appliedMoney.amount)
   }, priceWithOrderPercentageDiscounts))
 
-
-  // order amount discount here
-  const orderAmountDiscounts = order.appliedDiscounts.filter(discount => discount.discountType === "FIXED_AMOUNT")
-  const priceWithOrderAmountDiscounts = +Big(orderAmountDiscounts.reduce((itemPrice, { appliedMoney }) => {
-    return +Big(itemPrice).minus(appliedMoney.amount)
-  }, itemWithItemAmountDiscount))
-
-
   // UPDATE ORDER TOTAL Discount
-  let itemTotalDiscount = +Big(priceWithQuantity).minus(priceWithOrderAmountDiscounts)
-  orderTotalDiscount = +Big(orderTotalDiscount).plus(itemTotalDiscount)
+  let itemDiscount = +Big(priceWithQuantity).minus(priceWithItemAmountDiscount)
+  orderTotalDiscount = +Big(orderTotalDiscount).plus(itemDiscount)
 
-  let priceWithTax = priceWithOrderAmountDiscounts
-  if (orderLineItem.appliedTax) {
-    const taxPercentage = +Big(orderLineItem.appliedTax.percentage).div(100)
-    // UPDATE ORDER TOTAL TAX
-    let itemTotalTax = +Big(priceWithOrderAmountDiscounts).times(taxPercentage).round(0)
-    orderTotalTax = +Big(orderTotalTax).plus(itemTotalTax)
+  orderLineItem.priceWithItemAmountDiscount = priceWithItemAmountDiscount
+  return orderLineItem
+})
 
-    if (orderLineItem.appliedTax.inclusionType === "ADDITIVE") {
-      priceWithTax = +Big(priceWithTax).plus(itemTotalTax)
+// used to calculate portions of each items  order amount discount
+const orderCurrentSubtotal = +Big(lineItemsWithItemAmountDiscount.reduce((itemPrice, { priceWithItemAmountDiscount }) => {
+  return +Big(itemPrice).plus(priceWithItemAmountDiscount)
+}, 0))
+
+// update order total discount
+const orderAmountDiscounts = order.appliedDiscounts.filter(discount => discount.discountType === "FIXED_AMOUNT")
+const orderDiscountAmountsTotal = +Big(orderAmountDiscounts.reduce((price, { appliedMoney }) => {
+  return +Big(price).plus(appliedMoney.amount)
+}, 0))
+orderTotalDiscount = +Big(orderTotalDiscount).plus(orderDiscountAmountsTotal).round(0)
+
+
+lineItemsWithItemAmountDiscount.map(orderLineItem=>{
+    // order amount discount here
+    // console.log(orderAmountDiscounts)
+
+    const priceWithOrderAmountDiscounts = +Big(orderAmountDiscounts.reduce((itemPrice, { appliedMoney }) => {
+      let itemCurrentSubtotalPortion = +new Big(orderLineItem.priceWithItemAmountDiscount).div(orderCurrentSubtotal)
+      let itemOrderDiscount = + new Big(itemCurrentSubtotalPortion).times(appliedMoney.amount)
+
+      return +Big(itemPrice).minus(itemOrderDiscount).round(0)
+    }, orderLineItem.priceWithItemAmountDiscount))
+
+    let priceWithTax = priceWithOrderAmountDiscounts
+    if (orderLineItem.appliedTax) {
+      const taxPercentage = +Big(orderLineItem.appliedTax.percentage).div(100)
+      // UPDATE ORDER TOTAL TAX
+      let itemTotalTax = +Big(priceWithOrderAmountDiscounts).times(taxPercentage).round(0)
+      orderTotalTax = +Big(orderTotalTax).plus(itemTotalTax)
+  
+      if (orderLineItem.appliedTax.inclusionType === "ADDITIVE") {
+        priceWithTax = +Big(priceWithTax).plus(itemTotalTax)
+      }
     }
-  }
-
-
-  // let priceWithTax = priceWithOrderAmountDiscounts
-  // if (orderLineItem.appliedTax) {
-  //   const taxPercentage = +Big(orderLineItem.appliedTax.percentage).div(100)
-  //   // UPDATE ORDER TOTAL TAX
-  //   orderTotalTax = +Big(priceWithOrderAmountDiscounts).times(taxPercentage).round(0)
-
-  //   if (orderLineItem.appliedTax.inclusionType === "ADDITIVE") {
-  //     priceWithTax = +Big(priceWithTax).plus(orderTotalTax)
-  //   }
-  // }
-
-  orderTotalMoney = +Big(orderTotalMoney).plus(priceWithTax)
-
-  console.log("modifiers", modifiersPrice)
-  console.log("basePrice", basePrice)
-  console.log("priceWithQuantity", priceWithQuantity)
-  console.log("percentage item discount", priceWithItemDiscounts)
-  console.log("amount item amount", itemWithItemAmountDiscount)
-  console.log("final pricing with tax", priceWithTax)
-
-  if (!Big(priceWithTax).eq(orderLineItem.totalMoney.amount)) {
-    throw new Error(`item ${JSON.stringify(orderLineItem)} calculated wrong!`)
-  }
-}, 0)
+  
+    orderTotalMoney = +Big(orderTotalMoney).plus(priceWithTax)
+  
+    console.log("final pricing with tax", priceWithTax)
+    if(Big(priceWithTax).lt(0)){
+      throw new Error(`item ${JSON.stringify(orderLineItem)} price should not be under 0!`)
+    }
+  
+    if (!Big(priceWithTax).eq(orderLineItem.totalMoney.amount)) {
+      throw new Error(`item ${JSON.stringify(orderLineItem)} calculated wrong!`)
+    }
+})
 
 console.log("order total money", orderTotalMoney)
 console.log("order total discount", orderTotalDiscount)
 console.log("order total tax", orderTotalTax)
 
 if (!Big(order.totalMoney.amount).eq(orderTotalMoney)) {
-  throw new Error(`order totalMoney calculated wrong!`)
+  throw new Error(`Order totalMoney calculated wrong, it should be ${orderTotalMoney}!`)
 }
 
 if (!Big(order.totalTaxMoney.amount).eq(orderTotalTax)) {
-  throw new Error(`order totalTaxMoney calculated wrong!`)
+  throw new Error(`Order totalTaxMoney calculated wrong, it should be ${orderTotalTax}!`)
 }
 
 if (!Big(order.totalDiscountMoney.amount).eq(orderTotalDiscount)) {
-  throw new Error(`order totalDiscountMoney calculated wrong!`)
+  throw new Error(`Order totalDiscountMoney calculated wrong, it should be ${orderTotalDiscount}!`)
 }
-
-
-// big js round tests and DP
-// to fixed has rounding 
-
-
-
-// let x = new Big(0.118)
-
-// let y = x.plus(0.1921).plus(1).round(2)
-
-
-// console.log(Number(x),Number(y))
-
-
-// let z = x.plus(22222).div(100000)
-// z = Big(2.10111).times(100).round(2)
-
-// console.log(Number(z))
