@@ -17,7 +17,8 @@ let order = {
       "appliedTax": {
         "id": "1hBOAwi9bdZsWVTHBjgHGfNGyyC",
         "name": "TVSH",
-        "percentage": 20
+        "percentage": 20,
+        "inclusionType": "ADDITIVE"
       },
       "appliedDiscounts": [],
       "totalTaxMoney": {
@@ -29,7 +30,7 @@ let order = {
         "currency": "Leke"
       },
       "totalMoney": {
-        "amount": 27,
+        "amount": 32,
         "currency": "Leke"
       }
     },
@@ -118,7 +119,7 @@ let order = {
     }
   ],
   "totalMoney": {
-    "amount": 81,
+    "amount": 86,
     "currency": "Leke"
   },
   "totalTaxMoney": {
@@ -245,7 +246,7 @@ lineItemsWithItemAmountDiscount.map(orderLineItem => {
   }
 
   if (!Big(priceWithTax).eq(orderLineItem.totalMoney.amount)) {
-    throw new Error(`item ${JSON.stringify(orderLineItem)} calculated wrong!`)
+    throw new Error(`item ${JSON.stringify(orderLineItem)} calculated wrong!, ${orderTotalMoney}`)
   }
 })
 
