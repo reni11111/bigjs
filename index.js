@@ -18,8 +18,9 @@ let order = {
         "id": "1hBOAwi9bdZsWVTHBjgHGfNGyyC",
         "name": "TVSH",
         "percentage": 20,
-        "inclusionType": "ADDITIVE"
+        // "inclusionType": "ADDITIVE"
       },
+      taxInclusionType: "ADDITIVE",
       "appliedDiscounts": [],
       "totalTaxMoney": {
         "amount": 15,
@@ -233,7 +234,7 @@ lineItemsWithItemAmountDiscount.map(orderLineItem => {
     let itemTotalTax = +Big(priceWithOrderAmountDiscounts).times(taxPercentage).round(0)
     orderTotalTax = +Big(orderTotalTax).plus(itemTotalTax)
 
-    if (orderLineItem.appliedTax.inclusionType === "ADDITIVE") {
+    if (orderLineItem.taxInclusionType === "ADDITIVE") {
       priceWithTax = +Big(priceWithTax).plus(itemTotalTax)
     }
   }
