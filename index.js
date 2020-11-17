@@ -23,7 +23,7 @@ let order = {
       taxInclusionType: "ADDITIVE",
       "appliedDiscounts": [],
       "totalTaxMoney": {
-        "amount": 15,
+        "amount": 24,
         "currency": "Leke"
       },
       "totalDiscountMoney": {
@@ -53,7 +53,7 @@ let order = {
       },
       "appliedDiscounts": [],
       "totalTaxMoney": {
-        "amount": 15,
+        "amount": 24,
         "currency": "Leke"
       },
       "totalDiscountMoney": {
@@ -79,11 +79,11 @@ let order = {
       "appliedTax": {
         "id": "1hBOAwi9bdZsWVTHBjgHGfNGyyC",
         "name": "TVSH",
-        "percentage": 20
+        "percentage": 6
       },
       "appliedDiscounts": [],
       "totalTaxMoney": {
-        "amount": 15,
+        "amount": 7,
         "currency": "Leke"
       },
       "totalDiscountMoney": {
@@ -124,7 +124,7 @@ let order = {
     "currency": "Leke"
   },
   "totalTaxMoney": {
-    "amount": 72,
+    "amount": 55,
     "currency": "Leke"
   },
   "totalDiscountMoney": {
@@ -201,10 +201,9 @@ const orderDiscountAmountsTotal = +Big(orderAmountDiscounts.reduce((price, { app
 }, 0))
 orderTotalDiscount = +Big(orderTotalDiscount).plus(orderDiscountAmountsTotal).round(0)
 
+let groupedTaxes ={}
 
 lineItemsWithItemAmountDiscount.map(orderLineItem=>{
-  // order amount discount here
-  // console.log(orderAmountDiscounts)
 
   const priceWithOrderAmountDiscounts = +Big(orderAmountDiscounts.reduce((itemPrice, { appliedMoney }) => {
     let itemCurrentSubtotalPortion = +new Big(orderLineItem.priceWithItemAmountDiscount).div(orderCurrentSubtotal)
@@ -218,6 +217,28 @@ lineItemsWithItemAmountDiscount.map(orderLineItem=>{
     const taxPercentage = +Big(orderLineItem.appliedTax.percentage).div(100)
     // UPDATE ORDER TOTAL TAX
     let itemTotalTax = +Big(priceWithOrderAmountDiscounts).times(taxPercentage).round(0)
+
+    // grouped taxes
+    if(!(orderLineItem.appliedTax.percentage in groupedTaxes)){
+      console.log("not included")
+      groupedTaxes[orderLineItem.appliedTax.percentage] ={
+        VATRate: orderLineItem.appliedTax.percentage,
+        NumOfItems: orderLineItem.quantity,
+        // updated at end
+        PriceBefVat: priceWithTax-itemTotalTax,
+        // money amount of tax
+        VATAmt : itemTotalTax
+      }
+    } else {
+      groupedTaxes[orderLineItem.appliedTax.percentage].NumOfItems += orderLineItem.quantity
+      groupedTaxes[orderLineItem.appliedTax.percentage].VATAmt += itemTotalTax
+      groupedTaxes[orderLineItem.appliedTax.percentage].PriceBefVat += priceWithTax-itemTotalTax
+    }
+    console.log(groupedTaxes)
+
+    if(!Big(itemTotalTax).eq(orderLineItem.totalTaxMoney.amount)) {
+      throw new Error(`item applied TAX ${orderLineItem.itemId} calculated wrong!, should be ${itemTotalTax}`)
+    }
     orderTotalTax = +Big(orderTotalTax).plus(itemTotalTax)
 
     if(orderLineItem.taxInclusionType === 'ADDITIVE') {
@@ -235,6 +256,7 @@ lineItemsWithItemAmountDiscount.map(orderLineItem=>{
   if(!Big(priceWithTax).eq(orderLineItem.totalMoney.amount)) {
     throw new Error(`item ${JSON.stringify(orderLineItem)} calculated wrong!, should be ${priceWithTax}`)
   }
+
 })
 
 console.log('order total money', orderTotalMoney)
@@ -252,3 +274,8 @@ if(!Big(order.totalTaxMoney.amount).eq(orderTotalTax)) {
 if(!Big(order.totalDiscountMoney.amount).eq(orderTotalDiscount)) {
   throw new Error(`Order totalDiscountMoney calculated wrong, it should be ${orderTotalDiscount}!`)
 }
+
+// convert to array
+groupedTaxes = Object.keys(groupedTaxes).map(key=> groupedTaxes[key])
+
+console.log(groupedTaxes)
