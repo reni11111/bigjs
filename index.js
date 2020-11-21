@@ -5,7 +5,7 @@ let order = {
   "lineItems": [
     {
       "itemName": "Molle",
-      "quantity": 1,
+      "quantity": 2,
       "itemId": "itemi1",
       "variationName": "Molle e kuqe",
       "variationId": "1hBQW8hgPDEOvLQUYmGANSDdEnW",
@@ -20,10 +20,20 @@ let order = {
         "percentage": 20,
         // "inclusionType": "ADDITIVE"
       },
-      taxInclusionType: "ADDITIVE",
-      "appliedDiscounts": [],
+      // taxInclusionType: "ADDITIVE",
+      "appliedDiscounts": [
+        {
+          "id": "1hH8DsoxX9gzXdVnTzZGyYfjS7e",
+          "name": "100 Leke ulje",
+          "discountType": "FIXED_AMOUNT",
+          "appliedMoney": {
+            "amount": 20,
+            "currency": "Leke"
+          }
+        }
+      ],
       "totalTaxMoney": {
-        "amount": 24,
+        "amount": 40,
         "currency": "Leke"
       },
       "totalDiscountMoney": {
@@ -31,7 +41,7 @@ let order = {
         "currency": "Leke"
       },
       "totalMoney": {
-        "amount": 144,
+        "amount": 200,
         "currency": "Leke"
       }
     },
@@ -120,15 +130,15 @@ let order = {
     // }
   ],
   "totalMoney": {
-    "amount": 384,
+    "amount": 440,
     "currency": "Leke"
   },
   "totalTaxMoney": {
-    "amount": 55,
+    "amount": 71,
     "currency": "Leke"
   },
   "totalDiscountMoney": {
-    "amount": 0,
+    "amount": 40,
     "currency": "Leke"
   }
 
@@ -177,9 +187,13 @@ let lineItemsWithItemAmountDiscount = order.lineItems.map(orderLineItem => {
 
   // line item discount amount
   const itemAmountDiscounts = orderLineItem.appliedDiscounts.filter(discount => discount.discountType === 'FIXED_AMOUNT' || discount.discountType === 'VARIABLE_AMOUNT')
+
+  console.log(priceWithOrderPercentageDiscounts)
   const priceWithItemAmountDiscount = +Big(itemAmountDiscounts.reduce((itemPrice, { appliedMoney }) => {
-    return+Big(itemPrice).minus(appliedMoney.amount)
+    return +Big(itemPrice).minus(+Big(appliedMoney.amount).times(orderLineItem.quantity))
   }, priceWithOrderPercentageDiscounts))
+  console.log(priceWithItemAmountDiscount)
+
 
   // UPDATE ORDER TOTAL Discount
   let itemDiscount = +Big(priceWithQuantity).minus(priceWithItemAmountDiscount)
