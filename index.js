@@ -4,57 +4,62 @@ let order = {
   id: "orderTestId",
   "lineItems": [
     {
-      "itemName": "Molle",
+      "itemName": "Fletore vizatimi",
       "quantity": 2,
-      "itemId": "itemi1",
-      "variationName": "Molle e kuqe",
-      "variationId": "1hBQW8hgPDEOvLQUYmGANSDdEnW",
+      "barcode": "12345679",
+      "itemId": "1kU2Bx8kDVAQkfN5t2DgHeG0FQj",
+      "variationName": "Regular",
+      "variationId": "1kU2BwD6bQRH3jb6eimQpw8AIXG",
       "basePriceMoney": {
-        "amount": 120,
-        "currency": "Leke"
+          "amount": 100,
+          "currency": "Lekë"
       },
       "modifiers": [],
       "appliedTax": {
-        "id": "1hBOAwi9bdZsWVTHBjgHGfNGyyC",
-        "name": "TVSH",
-        "percentage": 20,
-        // "inclusionType": "ADDITIVE"
+          "id": "Tax0%",
+          "name": "0%",
+          "percentage": 10
       },
-      // taxInclusionType: "ADDITIVE",
       "appliedDiscounts": [
-        {
-          "id": "1hH8DsoxX9gzXdVnTzZGyYfjS7e",
-          "name": "100 Leke ulje",
-          "discountType": "FIXED_AMOUNT",
-          "appliedMoney": {
-            "amount": 20,
-            "currency": "Leke"
-          }
-        }
+          // {
+          //     "id": "1kU99q9mA7FYLKElokwQ6NM3ZDy",
+          //     "name": "100 leke ulje",
+          //     "discountType": "FIXED_AMOUNT",
+          //     "percentage": null,
+          //     "appliedMoney": {
+          //         "amount": 100,
+          //         "currency": "Lekë"
+          //     }
+          // }
       ],
       "totalTaxMoney": {
-        "amount": 40,
-        "currency": "Leke"
+          "amount": 18.18,
+          "currency": "Lekë"
       },
       "totalDiscountMoney": {
-        "amount": 60,
-        "currency": "Leke"
+          "amount": 0,
+          "currency": "Lekë"
       },
       "totalMoney": {
-        "amount": 200,
-        "currency": "Leke"
-      }
+          "amount": 200,
+          "currency": "Lekë"
+      },
+      "imageUrl": null,
+      "labelColor": "#6CCDFE",
+      "taxInclusionType": "INCLUSIVE",
+      // "priceWithItemAmountDiscount": 900
     },
     {
       "itemName": "Molle",
-      "quantity": 1,
+      "quantity": 3,
       "itemId": "itemi 2",
       "variationName": "Molle e kuqe",
       "variationId": "1hBQW8hgPDEOvLQUYmGANSDdEnW",
       "basePriceMoney": {
-        "amount": 120,
+        "amount": 20,
         "currency": "Leke"
       },
+      "taxInclusionType": "ADDITIVE",
       "modifiers": [],
       "appliedTax": {
         "id": "1hBOAwi9bdZsWVTHBjgHGfNGyyC",
@@ -63,48 +68,18 @@ let order = {
       },
       "appliedDiscounts": [],
       "totalTaxMoney": {
-        "amount": 24,
+        "amount": 12,
         "currency": "Leke"
       },
       "totalDiscountMoney": {
-        "amount": 60,
+        "amount": 0,
         "currency": "Leke"
       },
       "totalMoney": {
-        "amount": 120,
+        "amount": 72,
         "currency": "Leke"
       }
     },
-    {
-      "itemName": "Molle",
-      "quantity": 1,
-      "itemId": "itemi 3",
-      "variationName": "Molle e kuqe",
-      "variationId": "1hBQW8hgPDEOvLQUYmGANSDdEnW",
-      "basePriceMoney": {
-        "amount": 120,
-        "currency": "Leke"
-      },
-      "modifiers": [],
-      "appliedTax": {
-        "id": "1hBOAwi9bdZsWVTHBjgHGfNGyyC",
-        "name": "TVSH",
-        "percentage": 6
-      },
-      "appliedDiscounts": [],
-      "totalTaxMoney": {
-        "amount": 7,
-        "currency": "Leke"
-      },
-      "totalDiscountMoney": {
-        "amount": 60,
-        "currency": "Leke"
-      },
-      "totalMoney": {
-        "amount": 120,
-        "currency": "Leke"
-      }
-    }
   ],
   "locationId": "J11111111A",
   "appliedDiscounts": [
@@ -130,15 +105,15 @@ let order = {
     // }
   ],
   "totalMoney": {
-    "amount": 440,
+    "amount": 272,
     "currency": "Leke"
   },
   "totalTaxMoney": {
-    "amount": 71,
+    "amount": 30.18,
     "currency": "Leke"
   },
   "totalDiscountMoney": {
-    "amount": 40,
+    "amount": 0,
     "currency": "Leke"
   }
 
@@ -227,37 +202,49 @@ lineItemsWithItemAmountDiscount.map(orderLineItem=>{
   }, orderLineItem.priceWithItemAmountDiscount))
 
   let priceWithTax = priceWithOrderAmountDiscounts
-  if(orderLineItem.appliedTax) {
-    const taxPercentage = +Big(orderLineItem.appliedTax.percentage).div(100)
-    // UPDATE ORDER TOTAL TAX
-    let itemTotalTax = +Big(priceWithOrderAmountDiscounts).times(taxPercentage).round(0)
+  if (orderLineItem.appliedTax) {
+    let basePriceValue, taxValue
 
-    // grouped taxes
-    if(!(orderLineItem.appliedTax.percentage in groupedTaxes)){
+    if (orderLineItem.taxInclusionType === 'ADDITIVE') {
+      const taxPercentage = +Big(orderLineItem.appliedTax.percentage).div(100)
+      // UPDATE ORDER TOTAL TAX
+      taxValue = +Big(priceWithOrderAmountDiscounts).times(taxPercentage)
+
+      // values will be used at grouped taxes
+      basePriceValue = priceWithOrderAmountDiscounts
+
+      priceWithTax = +Big(priceWithTax).plus(taxValue).round(0)
+    } else if(orderLineItem.taxInclusionType === 'INCLUSIVE'){
+      console.log("ERDHII")
+      // inclusive basePrice price/(1+vat/100)
+      basePriceValue = +Big(priceWithOrderAmountDiscounts).div(+Big(1).plus(+Big(orderLineItem.appliedTax.percentage).div(100))).round(2)
+      // inclusive vatValue price - basePrice
+      taxValue = +Big(priceWithOrderAmountDiscounts).minus(basePriceValue).round(2)
+    }
+
+    orderTotalTax = +Big(orderTotalTax).plus(taxValue)
+
+    if (!Big(taxValue).eq(orderLineItem.totalTaxMoney.amount)) {
+      throw new Error(`item inclusive applied TAX ${orderLineItem.itemId} calculated wrong!, should be ${taxValue}`)
+    }
+
+        // grouped taxes
+    if (!(orderLineItem.appliedTax.percentage in groupedTaxes)) {
       console.log("not included")
-      groupedTaxes[orderLineItem.appliedTax.percentage] ={
+      groupedTaxes[orderLineItem.appliedTax.percentage] = {
         VATRate: orderLineItem.appliedTax.percentage,
         NumOfItems: orderLineItem.quantity,
         // updated at end
-        PriceBefVat: priceWithTax-itemTotalTax,
+        PriceBefVat: basePriceValue,
         // money amount of tax
-        VATAmt : itemTotalTax
+        VATAmt: taxValue
       }
     } else {
       groupedTaxes[orderLineItem.appliedTax.percentage].NumOfItems += orderLineItem.quantity
-      groupedTaxes[orderLineItem.appliedTax.percentage].VATAmt += itemTotalTax
-      groupedTaxes[orderLineItem.appliedTax.percentage].PriceBefVat += priceWithTax-itemTotalTax
+      groupedTaxes[orderLineItem.appliedTax.percentage].VATAmt += taxValue
+      groupedTaxes[orderLineItem.appliedTax.percentage].PriceBefVat += basePriceValue
     }
     console.log(groupedTaxes)
-
-    if(!Big(itemTotalTax).eq(orderLineItem.totalTaxMoney.amount)) {
-      throw new Error(`item applied TAX ${orderLineItem.itemId} calculated wrong!, should be ${itemTotalTax}`)
-    }
-    orderTotalTax = +Big(orderTotalTax).plus(itemTotalTax)
-
-    if(orderLineItem.taxInclusionType === 'ADDITIVE') {
-      priceWithTax = +Big(priceWithTax).plus(itemTotalTax)
-    }
   }
 
   orderTotalMoney = +Big(orderTotalMoney).plus(priceWithTax)
